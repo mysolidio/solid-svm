@@ -1,8 +1,9 @@
 use anchor_lang::prelude::*;
 
 #[account]
+#[derive(Default)]
 pub struct User {
-  username: [u8; 200],
-  master: Pubkey,
-  linking_wallets: Vec<Pubkey>
+    pub username: String,
+    pub master: Pubkey,
+    pub linking_wallets: Vec<Pubkey>
 }

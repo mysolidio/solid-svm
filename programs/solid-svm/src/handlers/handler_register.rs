@@ -2,45 +2,44 @@ use anchor_lang::prelude::*;
 use crate::state::User;
 use crate::common::SolidError;
 
-#[accounts]
+#[derive(Accounts)]
 #[instruction(username: String)]
-pub struct Register {
+pub struct Register<'info> {
   #[account(mut)]
-  user: Signer,
+  user: Signer<'info>,
 
   #[account(
-    mut,
+    init,
     payer = user,
     seeds = [b"user_account", user.key().as_ref()],
-    bump
+    bump,
+    space = 8 + 4 + 200 + 32 + 4 + 32 * 10 // discriminator + string length + max string + master pubkey + vec length prefix + linked wallets
   )]
   user_account: Account<'info, User>,
 
   #[account(
-    mut,
+    init,
     payer = user,
-    seeds = [b"identity", username.as_ref()],
-    bump
+    seeds = [b"identity", username.as_bytes()],
+    bump,
+    space = 8 + 32 // discriminator, user_account pubkey
   )]
   identity: Account<'info, User>,
+
+  pub system_program: Program<'info, System>,
 }
 
 pub fn process(ctx: Context<Register>, username: String) -> Result<()> {
   let user_account = &mut ctx.accounts.user_account;
 
-  let username_bytes = username.as_bytes();
-  require_gt!(username_bytes.len(),200, SolidError::UsernameTooLong);
+  require_gt!(200, username.len(), SolidError::UsernameTooLong);
 
-  let mut username_array = [0u8; 200];
-  username_array[..username_bytes.len()].copy_from_slice(username_bytes);
-
-  user_account.username = username_array;
+  user_account.username = username;
   user_account.master = ctx.accounts.user.key();
   user_account.linking_wallets = Vec::new();
 
-  let identity = &ctx.accounts.identity;
-
-  identity.user_account = ctx.accounts.user_account.key();
+  let identity = &mut ctx.accounts.identity;
+  identity.master = ctx.accounts.user_account.key();
 
   Ok(())
 }

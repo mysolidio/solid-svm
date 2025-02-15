@@ -5,14 +5,13 @@ use crate::state::User;
 use crate::common::SolidError;
 use crate::utils::verify_signature;
 
-#[accounts]
-pub struct LinkWallet {
+#[derive(Accounts)]
+pub struct LinkWallet<'info> {
   #[account(mut)]
-  master: Signer,
+  master: Signer<'info>,
 
   #[account(
     mut,
-    payer = master,
     seeds = [b"user_account", master.key().as_ref()],
     bump
   )]
@@ -30,10 +29,13 @@ pub fn process(ctx: Context<LinkWallet>, wallet: Pubkey) -> Result<()> {
   require_keys_eq!(verify_instruction.program_id, solana_program::ed25519_program::ID, SolidError::MustBeSignatureVerificationInstruction);
   let recover = verify_signature(verify_instruction.data).unwrap();
 
-  require_keys_eq!(recover.message.wallet, ctx.accounts.master, SolidError::  MasterKeyDoesNotMatch);
+  require_keys_eq!(recover.message.wallet, ctx.accounts.master.key(), SolidError::MasterKeyDoesNotMatch);
   require_keys_eq!(recover.signer, wallet, SolidError::LinkingWalletNotMatchWithSignerKey);
 
   let user_account = &mut ctx.accounts.userAccount;
+
+  // Check for duplicate wallet
+  require!(!user_account.linking_wallets.contains(&wallet), SolidError::WalletAlreadyLinked);
 
   user_account.linking_wallets.push(wallet);
 

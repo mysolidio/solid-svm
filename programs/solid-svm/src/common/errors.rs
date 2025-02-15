@@ -12,4 +12,10 @@ pub enum SolidError {
 
   #[msg("Previous instruction must be ed25519 signature verification")]
   MustBeSignatureVerificationInstruction,
+
+  #[msg("This wallet is already linked to the account")]
+  WalletAlreadyLinked,
+
+  #[msg("Invalid signature data.")]
+  SignatureDataInvalid,
 }

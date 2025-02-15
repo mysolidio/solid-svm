@@ -1578,6 +1578,9 @@ name = "solid-svm"
 version = "0.1.0"
 dependencies = [
  "anchor-lang",
+ "bincode",
+ "bytemuck",
+ "serde",
 ]
 
 [[package]]
