@@ -6,7 +6,7 @@ mod utils;
 
 use crate::handlers::*;
 
-declare_id!("A9FV1a1U1w1TkfAA6JWeH2qUaRJJrTyqhVoeomJUBVzr");
+declare_id!("4jEdE9sgNg8oViUbmqJe8R22jBkKHEtagFfp6gMXKc2T");
 
 #[program]
 pub mod solid_svm {

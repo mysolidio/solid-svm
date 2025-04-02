@@ -43,7 +43,6 @@ pub fn verify_signature(instruction_data: Vec<u8>) -> Result<SignatureRecover> {
       [SIGNATURE_OFFSETS_START..SIGNATURE_OFFSETS_START + SIGNATURE_OFFSETS_SERIALIZED_SIZE],
   );
 
-  // Check offsets and indices are correct so an attacker cannot submit invalid data
   if ed25519_offsets.signature_instruction_index != ed25519_offsets.public_key_instruction_index
     || ed25519_offsets.signature_instruction_index != ed25519_offsets.message_instruction_index
     || ed25519_offsets.public_key_offset

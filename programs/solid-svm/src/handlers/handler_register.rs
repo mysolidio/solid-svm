@@ -1,5 +1,5 @@
 use anchor_lang::prelude::*;
-use crate::state::User;
+use crate::state::*;
 use crate::common::SolidError;
 
 #[derive(Accounts)]
@@ -24,7 +24,7 @@ pub struct Register<'info> {
     bump,
     space = 8 + 32 // discriminator, user_account pubkey
   )]
-  identity: Account<'info, User>,
+  identity: Account<'info, Identity>,
 
   pub system_program: Program<'info, System>,
 }
