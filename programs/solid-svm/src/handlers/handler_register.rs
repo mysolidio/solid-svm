@@ -9,7 +9,7 @@ pub struct Register<'info> {
   user: Signer<'info>,
 
   #[account(
-    init,
+    init_if_needed,
     payer = user,
     seeds = [b"user_account", user.key().as_ref()],
     bump,

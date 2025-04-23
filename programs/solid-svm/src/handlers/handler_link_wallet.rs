@@ -6,16 +6,19 @@ use crate::common::SolidError;
 use crate::utils::verify_signature;
 
 #[derive(Accounts)]
+#[instruction(wallet: Pubkey)]
 pub struct LinkWallet<'info> {
   #[account(mut)]
-  master: Signer<'info>,
+  requester: Signer<'info>,
 
   #[account(
-    mut,
-    seeds = [b"user_account", master.key().as_ref()],
-    bump
+    init_if_needed,
+    payer = requester,
+    seeds = [b"user_account", wallet.key().as_ref()],
+    bump,
+    space = 8 + 4 + 200 + 32 + 4 + 32 * 10 // discriminator + string length + max string + master pubkey + vec length prefix + linked wallets
   )]
-  userAccount: Account<'info, User>,
+  master_account: Account<'info, User>,
 
   /// CHECK: Safe because it's a sysvar account
   #[account(address = sysvar::instructions::ID)]
@@ -29,15 +32,15 @@ pub fn process(ctx: Context<LinkWallet>, wallet: Pubkey) -> Result<()> {
   require_keys_eq!(verify_instruction.program_id, solana_program::ed25519_program::ID, SolidError::MustBeSignatureVerificationInstruction);
   let recover = verify_signature(verify_instruction.data).unwrap();
 
-  require_keys_eq!(recover.message.wallet, ctx.accounts.master.key(), SolidError::MasterKeyDoesNotMatch);
+  require_keys_eq!(recover.message.wallet, ctx.accounts.requester.key(), SolidError::MasterKeyDoesNotMatch);
   require_keys_eq!(recover.signer, wallet, SolidError::LinkingWalletNotMatchWithSignerKey);
 
-  let user_account = &mut ctx.accounts.userAccount;
+  let user_account = &mut ctx.accounts.master_account;
 
   // Check for duplicate wallet
-  require!(!user_account.linking_wallets.contains(&wallet), SolidError::WalletAlreadyLinked);
+  require!(!user_account.linking_wallets.contains(&ctx.accounts.requester.key()), SolidError::WalletAlreadyLinked);
 
-  user_account.linking_wallets.push(wallet);
+  user_account.linking_wallets.push(ctx.accounts.requester.key());
 
   msg!("Wallet linked: {}", wallet);
   Ok(())
