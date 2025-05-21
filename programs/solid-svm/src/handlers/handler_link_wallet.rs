@@ -31,17 +31,13 @@ pub fn process(ctx: Context<LinkWallet>, wallet: Pubkey) -> Result<()> {
   let verify_instruction = sysvar::instructions::get_instruction_relative(-1, &instructions)?;
   require_keys_eq!(verify_instruction.program_id, solana_program::ed25519_program::ID, SolidError::MustBeSignatureVerificationInstruction);
   let recover = verify_signature(verify_instruction.data).unwrap();
-
   require_keys_eq!(recover.message.wallet, ctx.accounts.requester.key(), SolidError::MasterKeyDoesNotMatch);
   require_keys_eq!(recover.signer, wallet, SolidError::LinkingWalletNotMatchWithSignerKey);
-
   let user_account = &mut ctx.accounts.master_account;
 
-  // Check for duplicate wallet
   require!(!user_account.linking_wallets.contains(&ctx.accounts.requester.key()), SolidError::WalletAlreadyLinked);
 
   user_account.linking_wallets.push(ctx.accounts.requester.key());
 
-  msg!("Wallet linked: {}", wallet);
   Ok(())
 }

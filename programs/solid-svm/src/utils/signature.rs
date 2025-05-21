@@ -27,7 +27,7 @@ pub const DATA_START: usize = SIGNATURE_OFFSETS_SERIALIZED_SIZE + SIGNATURE_OFFS
 #[derive(Serialize, Deserialize)]
 pub struct SignatureMessage {
   pub wallet: Pubkey,
-  pub nonce: u8
+  pub nonce: u64
 }
 
 #[derive(Serialize, Deserialize)]
