@@ -44,6 +44,15 @@ describe("Phantom Wallet Integration Tests", () => {
       provider.connection.confirmTransaction(sig2),
     ]);
 
+    // Register the master wallet first
+    const username =
+      "phantom_user_" + Math.random().toString(36).substring(2, 8);
+    await program.methods
+      .register(username)
+      .accounts({ user: masterWallet.publicKey })
+      .signers([masterWallet])
+      .rpc();
+
     // STEP 1: Create message in exact format required
     const nonce = Date.now(); // Phantom might use timestamp
     const message = `Link wallet: ${linkingWallet.publicKey.toString()} with nonce: ${nonce}`;
@@ -88,6 +97,10 @@ describe("Phantom Wallet Integration Tests", () => {
     );
 
     const userAccount = await program.account.user.fetch(userAccountPda);
+    expect(userAccount.username).to.equal(username);
+    expect(userAccount.master.toBase58()).to.equal(
+      masterWallet.publicKey.toBase58()
+    );
     expect(userAccount.linkingWallets).to.have.length(1);
     expect(userAccount.linkingWallets[0].toBase58()).to.equal(
       linkingWallet.publicKey.toBase58()
@@ -113,6 +126,15 @@ describe("Phantom Wallet Integration Tests", () => {
       provider.connection.confirmTransaction(sig1),
       provider.connection.confirmTransaction(sig2),
     ]);
+
+    // Register the master wallet first
+    const username =
+      "phantom_user_" + Math.random().toString(36).substring(2, 8);
+    await program.methods
+      .register(username)
+      .accounts({ user: masterWallet.publicKey })
+      .signers([masterWallet])
+      .rpc();
 
     // Test different nonce types that Phantom wallet might generate
     const nonceTypes = [
@@ -150,12 +172,26 @@ describe("Phantom Wallet Integration Tests", () => {
     const masterWallet = Keypair.generate();
     const linkingWallet = Keypair.generate();
 
-    // Airdrop SOL
-    const signature = await provider.connection.requestAirdrop(
+    // Airdrop SOL to both wallets
+    const sig1 = await provider.connection.requestAirdrop(
+      masterWallet.publicKey,
+      2 * anchor.web3.LAMPORTS_PER_SOL
+    );
+    await provider.connection.confirmTransaction(sig1);
+    const sig2 = await provider.connection.requestAirdrop(
       linkingWallet.publicKey,
       2 * anchor.web3.LAMPORTS_PER_SOL
     );
-    await provider.connection.confirmTransaction(signature);
+    await provider.connection.confirmTransaction(sig2);
+
+    // Register the master wallet first
+    const username =
+      "phantom_user_" + Math.random().toString(36).substring(2, 8);
+    await program.methods
+      .register(username)
+      .accounts({ user: masterWallet.publicKey })
+      .signers([masterWallet])
+      .rpc();
 
     // Common mistakes users might make when constructing messages
     const invalidFormats = [
@@ -252,24 +288,23 @@ describe("Phantom Wallet Integration Tests", () => {
       provider.connection.confirmTransaction(sig2),
     ]);
 
-    // STEP 1: User registers their master account first (if not already done)
-    const username = "phantom_user_" + Date.now();
+    // Register the master wallet first
+    const username =
+      "phantom_user_" + Math.random().toString(36).substring(2, 8);
     await program.methods
       .register(username)
-      .accounts({
-        user: masterWallet.publicKey,
-      })
+      .accounts({ user: masterWallet.publicKey })
       .signers([masterWallet])
       .rpc();
 
-    // STEP 2: Frontend creates message for user to sign
+    // STEP 1: Frontend creates message for user to sign
     const nonce = Date.now(); // Use timestamp as nonce
     const messageToSign = `Link wallet: ${linkingWallet.publicKey.toString()} with nonce: ${nonce}`;
 
     console.log("Message user will sign in Phantom:");
     console.log(messageToSign);
 
-    // STEP 3: User signs message in Phantom wallet
+    // STEP 2: User signs message in Phantom wallet
     const messageBytes = new TextEncoder().encode(messageToSign);
 
     // Simulate Phantom's signMessage response
@@ -279,7 +314,7 @@ describe("Phantom Wallet Integration Tests", () => {
       masterWallet.secretKey
     );
 
-    // STEP 4: Frontend creates and sends transaction
+    // STEP 3: Frontend creates and sends transaction
     const verifyInstruction = Ed25519Program.createInstructionWithPublicKey({
       publicKey: masterWallet.publicKey.toBytes(),
       message: messageBytes,
@@ -297,10 +332,10 @@ describe("Phantom Wallet Integration Tests", () => {
     transaction.add(verifyInstruction);
     transaction.add(linkWalletIx);
 
-    // STEP 5: Send transaction (linking wallet pays fees)
+    // STEP 4: Send transaction (linking wallet pays fees)
     await provider.sendAndConfirm(transaction, [linkingWallet]);
 
-    // STEP 6: Verify the wallet was successfully linked
+    // STEP 5: Verify the wallet was successfully linked
     const [userAccountPda] = PublicKey.findProgramAddressSync(
       [Buffer.from("user_account"), masterWallet.publicKey.toBuffer()],
       program.programId

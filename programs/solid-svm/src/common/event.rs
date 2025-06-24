@@ -7,3 +7,10 @@ pub struct UserRegistered {
     pub user_account: Pubkey,
     pub identity: Pubkey,
 }
+
+#[event]
+pub struct WalletLinked {
+    pub master: Pubkey,
+    pub linked_wallet: Pubkey,
+    pub nonce: u64,
+}

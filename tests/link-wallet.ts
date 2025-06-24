@@ -38,6 +38,13 @@ describe("link-wallet", () => {
     );
     await provider.connection.confirmTransaction(signature2);
 
+    const username = "testuser_" + Math.random().toString(36).substring(2, 8);
+    await program.methods
+      .register(username)
+      .accounts({ user: masterWallet.publicKey })
+      .signers([masterWallet])
+      .rpc();
+
     // Create plain text message in the new format
     const nonce = 10;
     const messageText = `Link wallet: ${linkingWallet.publicKey.toString()} with nonce: ${nonce}`;
@@ -100,6 +107,13 @@ describe("link-wallet", () => {
       2 * anchor.web3.LAMPORTS_PER_SOL
     );
     await provider.connection.confirmTransaction(signature2);
+
+    const username = "testuser_" + Math.random().toString(36).substring(2, 8);
+    await program.methods
+      .register(username)
+      .accounts({ user: masterWallet.publicKey })
+      .signers([masterWallet])
+      .rpc();
 
     // Create message exactly as Phantom wallet would
     const nonce = Math.floor(Math.random() * 1000000); // Random nonce like Phantom would use
@@ -268,5 +282,77 @@ describe("link-wallet", () => {
         expect(error).to.exist;
       }
     }
+  });
+
+  it("Emits WalletLinked event on successful link", async () => {
+    const masterWallet = Keypair.generate();
+    const linkingWallet = Keypair.generate();
+    const username = "testuser_" + Math.random().toString(36).substring(2, 8);
+
+    // Airdrop SOL to both wallets
+    const sig1 = await provider.connection.requestAirdrop(
+      masterWallet.publicKey,
+      2 * anchor.web3.LAMPORTS_PER_SOL
+    );
+    await provider.connection.confirmTransaction(sig1);
+    const sig2 = await provider.connection.requestAirdrop(
+      linkingWallet.publicKey,
+      2 * anchor.web3.LAMPORTS_PER_SOL
+    );
+    await provider.connection.confirmTransaction(sig2);
+
+    // Register the master wallet first
+    await program.methods
+      .register(username)
+      .accounts({ user: masterWallet.publicKey })
+      .signers([masterWallet])
+      .rpc();
+
+    // Prepare message and signature for linking
+    const nonce = Math.floor(Math.random() * 1000000);
+    const messageText = `Link wallet: ${linkingWallet.publicKey.toString()} with nonce: ${nonce}`;
+    const messageBuffer = new TextEncoder().encode(messageText);
+    const signatureBytes = nacl.sign.detached(
+      messageBuffer,
+      masterWallet.secretKey
+    );
+    const verifyInstruction = Ed25519Program.createInstructionWithPublicKey({
+      publicKey: masterWallet.publicKey.toBytes(),
+      message: messageBuffer,
+      signature: signatureBytes,
+    });
+    const linkWalletIx = await program.methods
+      .linkWallet(masterWallet.publicKey)
+      .accounts({ requester: linkingWallet.publicKey })
+      .instruction();
+
+    // Listen for the WalletLinked event
+    const eventPromise = new Promise<any>((resolve, reject) => {
+      const listener = program.addEventListener(
+        "walletLinked",
+        (event, slot, sig) => {
+          program.removeEventListener(listener);
+          resolve(event);
+        }
+      );
+      setTimeout(() => {
+        program.removeEventListener(listener);
+        reject(new Error("WalletLinked event not emitted in time"));
+      }, 10000);
+    });
+
+    // Send transaction
+    const tx = new anchor.web3.Transaction();
+    tx.add(verifyInstruction);
+    tx.add(linkWalletIx);
+    await provider.sendAndConfirm(tx, [linkingWallet], { skipPreflight: true });
+
+    // Wait for the event and assert
+    const event = await eventPromise;
+    expect(event.master.toBase58()).to.equal(masterWallet.publicKey.toBase58());
+    expect(event.linkedWallet.toBase58()).to.equal(
+      linkingWallet.publicKey.toBase58()
+    );
+    expect(Number(event.nonce)).to.equal(nonce);
   });
 });
