@@ -1,6 +1,7 @@
 use anchor_lang::prelude::*;
 use crate::state::*;
 use crate::common::SolidError;
+use crate::common::event::UserRegistered;
 
 #[derive(Accounts)]
 #[instruction(username: String)]
@@ -34,12 +35,19 @@ pub fn process(ctx: Context<Register>, username: String) -> Result<()> {
 
   require_gt!(200, username.len(), SolidError::UsernameTooLong);
 
-  user_account.username = username;
+  user_account.username = username.clone();
   user_account.master = ctx.accounts.user.key();
   user_account.linking_wallets = Vec::new();
 
   let identity = &mut ctx.accounts.identity;
   identity.master = ctx.accounts.user_account.key();
+
+  emit!(UserRegistered {
+      user: ctx.accounts.user.key(),
+      username,
+      user_account: ctx.accounts.user_account.key(),
+      identity: ctx.accounts.identity.key(),
+  });
 
   Ok(())
 }
