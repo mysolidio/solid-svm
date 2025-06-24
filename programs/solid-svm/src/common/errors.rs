@@ -18,4 +18,7 @@ pub enum SolidError {
 
   #[msg("Invalid signature data.")]
   SignatureDataInvalid,
+
+  #[msg("Master account is not registered. Please register first.")]
+  MasterAccountNotRegistered,
 }

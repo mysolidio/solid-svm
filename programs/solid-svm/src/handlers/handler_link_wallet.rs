@@ -4,6 +4,7 @@ use anchor_lang::solana_program::sysvar;
 use crate::state::User;
 use crate::common::SolidError;
 use crate::utils::verify_signature;
+use crate::common::event::WalletLinked;
 
 #[derive(Accounts)]
 #[instruction(wallet: Pubkey)]
@@ -35,9 +36,18 @@ pub fn process(ctx: Context<LinkWallet>, wallet: Pubkey) -> Result<()> {
   require_keys_eq!(recover.signer, wallet, SolidError::LinkingWalletNotMatchWithSignerKey);
   let user_account = &mut ctx.accounts.master_account;
 
+  // Ensure the master account is already registered
+  require!(user_account.master != Pubkey::default(), SolidError::MasterAccountNotRegistered);
+
   require!(!user_account.linking_wallets.contains(&ctx.accounts.requester.key()), SolidError::WalletAlreadyLinked);
 
   user_account.linking_wallets.push(ctx.accounts.requester.key());
+
+  emit!(WalletLinked {
+    master: user_account.master,
+    linked_wallet: ctx.accounts.requester.key(),
+    nonce: recover.message.nonce,
+  });
 
   Ok(())
 }

@@ -2,6 +2,7 @@ use anchor_lang::prelude::*;
 use bytemuck::{from_bytes, Pod, Zeroable};
 use serde::{Deserialize, Serialize};
 use crate::common::SolidError;
+use std::str;
 
 // Structs and constants copied from solana_sdk::ed25519_instruction. Copied in order to make fields public.
 // Compilation issues hit when importing solana_sdk
@@ -36,12 +37,40 @@ pub struct SignatureRecover {
   pub message: SignatureMessage,
 }
 
-pub fn verify_signature(instruction_data: Vec<u8>) -> Result<SignatureRecover> {
+// Helper function to parse plain text message
+fn parse_message_text(message_text: &str) -> Result<SignatureMessage> {
+  // Parse the format: "Link wallet: [wallet_address] with nonce: [nonce]"
+  let parts: Vec<&str> = message_text.split_whitespace().collect();
+  
+  // Expected format: ["Link", "wallet:", "[wallet_address]", "with", "nonce:", "[nonce]"]
+  if parts.len() != 6 || parts[0] != "Link" || parts[1] != "wallet:" || parts[3] != "with" || parts[4] != "nonce:" {
+    return Err(SolidError::SignatureDataInvalid.into());
+  }
+  
+  // Parse wallet address
+  let wallet = parts[2].parse::<Pubkey>()
+    .map_err(|_| SolidError::SignatureDataInvalid)?;
+  
+  // Parse nonce
+  let nonce = parts[5].parse::<u64>()
+    .map_err(|_| SolidError::SignatureDataInvalid)?;
+  
+  Ok(SignatureMessage { wallet, nonce })
+}
 
-  let ed25519_offsets = from_bytes::<Ed25519SignatureOffsets>(
-    &instruction_data
-      [SIGNATURE_OFFSETS_START..SIGNATURE_OFFSETS_START + SIGNATURE_OFFSETS_SERIALIZED_SIZE],
+pub fn verify_signature(instruction_data: Vec<u8>) -> Result<SignatureRecover> {
+  // Ensure we have enough data
+  if instruction_data.len() < SIGNATURE_OFFSETS_START + SIGNATURE_OFFSETS_SERIALIZED_SIZE {
+    return Err(SolidError::SignatureDataInvalid.into());
+  }
+
+  // Create a properly aligned buffer for from_bytes
+  let mut offsets_buffer = [0u8; SIGNATURE_OFFSETS_SERIALIZED_SIZE];
+  offsets_buffer.copy_from_slice(
+    &instruction_data[SIGNATURE_OFFSETS_START..SIGNATURE_OFFSETS_START + SIGNATURE_OFFSETS_SERIALIZED_SIZE]
   );
+  
+  let ed25519_offsets = from_bytes::<Ed25519SignatureOffsets>(&offsets_buffer);
 
   if ed25519_offsets.signature_instruction_index != ed25519_offsets.public_key_instruction_index
     || ed25519_offsets.signature_instruction_index != ed25519_offsets.message_instruction_index
@@ -62,7 +91,11 @@ pub fn verify_signature(instruction_data: Vec<u8>) -> Result<SignatureRecover> {
 
   let message_data = &instruction_data[ed25519_offsets.message_data_offset as usize..];
 
-  let message : SignatureMessage = bincode::deserialize(message_data).map_err(|_| SolidError::SignatureDataInvalid)?;
+  // Convert message data bytes to UTF-8 string and parse the plain text format
+  let message_text = str::from_utf8(message_data)
+    .map_err(|_| SolidError::SignatureDataInvalid)?;
+  
+  let message = parse_message_text(message_text)?;
 
   Ok(SignatureRecover{
     signer: message_signer,
