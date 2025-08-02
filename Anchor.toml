@@ -5,7 +5,7 @@ resolution = true
 skip-lint = false
 
 [programs.localnet]
-solid_svm = "6UZqUB1eVVzUkjrA9bCETqby9GiApBKGwgWoQZ3Qr4EY"
+solid_svm = "65ggx1TjBoGrwzPtD77QmFugfzDxRz6TTDKrxTGni3Js"
 
 [registry]
 url = "https://api.apr.dev"
